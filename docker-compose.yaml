@@ -1,0 +1,33 @@
+version: '3.7'
+
+services:
+  redis:
+    image: 'redis:7.2-alpine'
+    ports:
+      - '6379:6379'
+    networks:
+      - intranet
+  core:
+    build: 
+      context: ./services/core
+      target: development
+    volumes:
+      - ./services/core/app:/usr/src/app
+    ports:
+      - 3000:3000
+    depends_on:
+      - redis
+    networks:
+      - intranet
+  nginx:
+    build: ./infra/nginx
+    ports:
+    - '8080:8080'
+    depends_on:
+      - core
+    networks:
+      - intranet
+  
+networks:
+  intranet:
+    driver: "bridge"

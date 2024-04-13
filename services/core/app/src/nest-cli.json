@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "webpack": true
+  },
+  "projects": {
+    "coordinator": {
+      "type": "library",
+      "root": "libs/coordinator",
+      "entryFile": "index",
+      "sourceRoot": "libs/coordinator/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/coordinator/tsconfig.lib.json"
+      }
+    },
+    "storage": {
+      "type": "library",
+      "root": "libs/storage",
+      "entryFile": "index",
+      "sourceRoot": "libs/storage/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/storage/tsconfig.lib.json"
+      }
+    }
+  }
+}
