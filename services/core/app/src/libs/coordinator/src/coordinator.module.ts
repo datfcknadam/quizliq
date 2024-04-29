@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { CoordinatorService } from './coordinator.service';
 import { CoordinatorGateway } from './coordinator.gateway';
-import { CoordinatorController } from './coordinator/coordinator.controller';
+import { GameService } from 'src/libs/game/src';
 
 @Module({
-  providers: [CoordinatorService, CoordinatorGateway],
+  providers: [CoordinatorService, CoordinatorGateway, GameService],
   exports: [CoordinatorService],
-  controllers: [CoordinatorController],
 })
 export class CoordinatorModule {}

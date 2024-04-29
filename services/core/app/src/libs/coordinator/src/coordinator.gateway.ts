@@ -2,7 +2,6 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
-  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -10,29 +9,42 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { CoordinatorService } from './coordinator.service';
+import { GameService } from 'src/libs/game/src';
+import { OnModuleInit } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class CoordinatorGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
-  constructor(private gcService: CoordinatorService) {}
+export class CoordinatorGateway implements OnModuleInit, OnGatewayConnection {
+  constructor(
+    private gcService: CoordinatorService,
+    private gameService: GameService,
+  ) {}
 
   @WebSocketServer()
   server: Server;
 
   @SubscribeMessage('gc')
-  createRoom(
+  async gcEvents(
+    @MessageBody() data: { method: string; payload: unknown },
+    @ConnectedSocket() client: Socket,
+  ): Promise<WsResponse<unknown>> {
+    return {
+      event: 'gc',
+      data: await this.gcService.interface(data.method, client, data.payload),
+    };
+  }
+
+  @SubscribeMessage('game')
+  gameEvents(
     @MessageBody() data: { method: string; payload: unknown },
     @ConnectedSocket() client: Socket,
   ): WsResponse<unknown> {
-    console.log(data);
     return {
-      event: 'gc',
-      data: this.gcService.interface(data.method, client, data.payload),
+      event: 'game',
+      data: this.gameService.interface(data.method, client, data.payload),
     };
   }
 
@@ -41,11 +53,17 @@ export class CoordinatorGateway
     return data;
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Disconnected: ${client.id}`);
+  async handleConnection(client: Socket) {
+    client.on('disconnecting', async () =>
+      Promise.all(
+        [...client.rooms.values()].map(async (roomId) =>
+          this.gcService.interface('leaveRoom', client, { roomId }),
+        ),
+      ),
+    );
   }
 
-  handleConnection(client: Socket, ...args: any[]) {
-    console.log(`Connected ${client.id}`);
+  onModuleInit() {
+    this.gameService.initGameLoop(this.server);
   }
 }

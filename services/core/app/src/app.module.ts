@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CoordinatorModule } from './libs/coordinator/src';
-import { StorageModule } from './libs/storage/src';
+import { EventModule } from './libs/event/src';
 
 @Module({
-  imports: [StorageModule, CoordinatorModule],
+  imports: [EventModule, CoordinatorModule],
   controllers: [AppController],
   providers: [AppService],
-  exports: [StorageModule],
+  exports: [EventModule],
 })
 export class AppModule {}
