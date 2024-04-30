@@ -12,9 +12,7 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.16.11",
-    "@svg-maps/taiwan": "^1.1.0",
-    "@svg-maps/usa": "^1.1.1",
-    "@svg-maps/world": "^1.0.1",
+    "@quizliq-maps/usa-half": "^1.0.0",
     "core-js": "^3.8.3",
     "pinia": "^2.1.7",
     "quasar": "^2.15.4",
@@ -22,7 +20,7 @@
     "vue": "^3.4.21",
     "vue-i18n": "^9.9.0",
     "vue-router": "^4.3.0",
-    "vue3-svg-map": "../../../vue3-svg-map"
+    "vue3-svg-map": "^1.0.10"
   },
   "devDependencies": {
     "@babel/core": "^7.24.4",

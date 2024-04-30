@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
 import { Socket } from 'socket.io';
 import { GameService } from 'src/libs/game/src';
+import { GAME_STATUS } from 'src/libs/game/src/game.const';
 
 @Injectable()
 export class CoordinatorService {
@@ -34,8 +35,7 @@ export class CoordinatorService {
 
   private createRoom(): { roomId: string } {
     const roomId = uuid();
-    // todo: uncommit when ready settings
-    // this.storage.client.json.set('gc:room', roomId, settings);
+    this.gameService.setStatus(roomId, GAME_STATUS.LOBBY);
     return { roomId };
   }
 
@@ -58,9 +58,11 @@ export class CoordinatorService {
           ...this.names[index],
         })),
         activeUserId: await this.gameService.getActiveUser(roomId),
+        gameStatus: await this.gameService.getStatus(roomId),
       },
     };
     client.to(roomId).emit('gc', result);
+    this.gameService.clientJoinGame(roomId, client.id);
     return result.payload;
   }
 

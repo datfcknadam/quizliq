@@ -1,6 +1,6 @@
 <template>
-  <q-layout view="hHh lpR fff">
-    <q-header bordered class="bg-grey-3 text-primary">
+  <q-layout view="lHh lpr lFf" class="shadow-2 rounded-borders">
+    <q-header elevated bordered class="bg-grey-3 text-primary">
       <q-toolbar>
         <q-toolbar-title> Quizliq </q-toolbar-title>
       </q-toolbar>

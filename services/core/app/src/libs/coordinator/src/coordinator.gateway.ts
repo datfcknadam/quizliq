@@ -64,6 +64,6 @@ export class CoordinatorGateway implements OnModuleInit, OnGatewayConnection {
   }
 
   onModuleInit() {
-    this.gameService.initGameLoop(this.server);
+    this.gameService.provideSockets(this.server);
   }
 }

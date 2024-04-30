@@ -5,5 +5,7 @@ export default {
   room: {
     start: 'Начать',
   },
-  game: {},
+  game: {
+    isYou: '(ты)',
+  },
 };

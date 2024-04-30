@@ -3,8 +3,9 @@
     Игра началась
     <b v-show="gameStore.isActiveUser">Твой ход</b>
     <CheckboxSvgMap
-      :value="selectedLocations"
-      :map="usa"
+      :value="flatSelectedLocations"
+      :map="getMap"
+      :style="mapStyle"
       class="game-view__map"
       @add="gameStore.selectPosition"
       @remove="gameStore.selectPosition"
@@ -12,7 +13,7 @@
       @blur="gameStore.blurLocation"
     />
     <q-dialog
-      :model-value="true"
+      model-value
       no-focus
       full-width
       persistent
@@ -29,10 +30,16 @@
               v-for="(client, key) in clients.values()"
               :color="client.color"
               :key="key"
+              :size="client.id === activeUserId ? 'lg' : 'md'"
               :disable="client.id !== activeUserId"
               glossy
             >
               {{ client.name }}
+              <span
+                v-if="client.id === socket.id"
+                v-text="$t('game.isYou')"
+                class="q-ml-xs"
+              />
             </q-btn>
           </q-btn-group>
         </q-card-section>
@@ -43,16 +50,21 @@
 
 <script setup>
 import { storeToRefs } from 'pinia';
-import { useGameStore } from '@/stores/game';
-import { useGcStore } from '@/stores/gc';
+import MapLocations from '@quizliq-maps/usa-half';
 import { CheckboxSvgMap } from 'vue3-svg-map';
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
-import usa from '@svg-maps/usa';
+import { useGameStore } from '@/stores/game';
+import { useGcStore } from '@/stores/gc';
+import { socket } from '@/socket';
 
 const gameStore = useGameStore();
 const gcStore = useGcStore();
 const route = useRoute();
+const { flatSelectedLocations, activeUserId, isActiveUser, getMap } = storeToRefs(gameStore);
+const { clients } = storeToRefs(gcStore);
+gameStore.setMap(MapLocations);
 
 function styleFn(offset) {
   return {
@@ -60,16 +72,34 @@ function styleFn(offset) {
     height: offset ? `calc(100vh - ${offset}px)` : '100vh',
   };
 }
+const mapStyle = computed(() => {
+  const style = {};
+  if (!isActiveUser.value) {
+    style.cursor = 'not-allowed';
+  }
+  return style;
+});
 
 if (!gcStore.inRoom) {
   gcStore.joinRoom(route.params.id);
 }
-
-const { selectedLocations, activeUserId } = storeToRefs(gameStore);
-const { clients } = storeToRefs(gcStore);
 </script>
-<style scoped>
-.game-view {
-  display: inline-flex;
-}
+<style lang="sass">
+.game-view 
+  display: inline-flex
+  .fill
+    &-red
+      fill: $red
+    &-orange
+      fill: $orange
+    &-yellow
+      fill: $yellow
+    &-green
+      fill: $green
+    &-blue
+      fill: $blue
+    &-indigo
+      fill: $indigo
+    &-purple
+      fill: $purple
 </style>

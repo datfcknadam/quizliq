@@ -2,10 +2,10 @@
   "compilerOptions": {
     "target": "es5",
     "module": "esnext",
-    "baseUrl": "../src",
+    "baseUrl": "./",
     "moduleResolution": "node",
     "paths": {
-      "@/*": ["../src/*"],
+      "@/*": ["./src/*"],
     },
     "lib": [
       "esnext",
@@ -14,6 +14,6 @@
       "scripthost"
     ]
   },
-  "include": ["../src/**/*"],
+  "include": ["./src/**/*"],
   "exclude": ["node_modules", "dist"],
 }

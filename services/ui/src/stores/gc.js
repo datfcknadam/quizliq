@@ -7,6 +7,7 @@ export const useGcStore = defineStore('gc', {
   state: () => ({
     clients: new Map(),
     inRoom: false,
+    gameStatus: 0,
   }),
   actions: {
     bootstrap() {
@@ -31,10 +32,11 @@ export const useGcStore = defineStore('gc', {
       gameStore.bootstrap();
       socket.emit('gc', { method: 'joinRoom', payload: { roomId } });
     },
-    joinRoomRes({ clients, activeUserId }) {
+    joinRoomRes({ clients, activeUserId, gameStatus }) {
       const gcStore = useGameStore();
       gcStore.activeUserId = activeUserId;
       this.inRoom = true;
+      this.gameStatus = gameStatus;
       this.clients = new Map(clients.filter(Boolean).map((it) => [it.id, it]));
     },
     leaveRoomRes(result) {
