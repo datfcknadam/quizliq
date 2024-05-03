@@ -7,22 +7,58 @@ services:
       - '6379:6379'
     networks:
       - intranet
+  postgres:
+    image: 'postgres:16.2-alpine3.19'
+    shm_size: 128mb
+    volumes:
+      - ./infra/postgres/data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    networks:
+      - intranet
+    env_file:
+      - ./infra/postgres/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U habrpguser -d habrdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+  admin:
+    build: 
+      context: ./services/admin
+      target: development
+    volumes:
+      - ./services/admin/app:/usr/src/app
+      - /usr/src/app/node_modules/
+    restart: unless-stopped
+    ports:
+      - 1337:9000
+    depends_on:
+      - postgres
+    networks:
+      - intranet
   core:
     build: 
       context: ./services/core
       target: development
     volumes:
       - ./services/core/app:/usr/src/app
+      - /usr/src/app/node_modules/
     ports:
       - 3000:3000
     depends_on:
       - redis
     networks:
       - intranet
+    env_file:
+      - ./services/core/envs/.env
   nginx:
     build: ./infra/nginx
     ports:
     - '8080:8080'
+    - '9000:9000'
     depends_on:
       - core
     networks:

@@ -33,6 +33,7 @@ export class CoordinatorService {
     };
   }
 
+  // todo: switch sockets to http
   private createRoom(): { roomId: string } {
     const roomId = uuid();
     this.gameService.setStatus(roomId, GAME_STATUS.LOBBY);

@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 COPY app/package*.json ./
 RUN npm install
 
-CMD ["npm", "run", "start:dev"]
+CMD ["npm", "run", "develop"]
 
 FROM node:20-alpine3.18 as production
 

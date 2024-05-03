@@ -29,6 +29,15 @@
       "compilerOptions": {
         "tsConfigPath": "libs/game/tsconfig.lib.json"
       }
+    },
+    "content": {
+      "type": "library",
+      "root": "libs/content",
+      "entryFile": "index",
+      "sourceRoot": "libs/content/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/content/tsconfig.lib.json"
+      }
     }
   }
 }
