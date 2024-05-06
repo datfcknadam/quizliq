@@ -88,14 +88,12 @@ export const useGameStore = defineStore('game', {
     setActiveUserRes({ clientId, gameStatus }) {
       this.activeUserId = clientId;
       this.gameStatus = gameStatus;
+      this.questionState = QUESTION_STATE.INNACTIVE;
     },
     setMap(map) {
       this.map = map;
     },
     setChoice(choice) {
-      if (this.questionState !== QUESTION_STATE.ACTIVE) {
-        return;
-      }
       this.stopTimer();
       this.selectedChoice = choice;
       socket.emit('game', {
@@ -106,7 +104,8 @@ export const useGameStore = defineStore('game', {
     sendQuestionRes({ question, options }) {
       const preparedQuestion = question.type === QUESTION_TYPE.OPTION_SELECTION
       ? { ...question, choices: JSON.parse(question.choices)} : question;
-
+      this.selectedChoice = null;
+      this.answer = null;
       this.startTimer(options.time);
       this.questionState = QUESTION_STATE.ACTIVE;
       this.question = preparedQuestion;
@@ -115,7 +114,7 @@ export const useGameStore = defineStore('game', {
       this.time = time;
       this.timer = setInterval(() => {
         if (this.time <= 0) {
-          this.stopTimer()
+          this.setChoice(null);
         }
         this.time -= 1000;
       }, 1000);

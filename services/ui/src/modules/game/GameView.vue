@@ -32,7 +32,7 @@
               :color="client.color"
               :key="key"
               :size="client.id === activeUserId ? 'lg' : 'md'"
-              :disable="client.id !== activeUserId"
+              :disable="questionState === QUESTION_STATE.INNACTIVE && client.id !== activeUserId"
               glossy
             >
               {{ client.name }}
@@ -56,7 +56,7 @@ import { CheckboxSvgMap } from 'vue3-svg-map';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import GameQuestionDialog from './components/GameQuestionDialog.vue';
-
+import { QUESTION_STATE } from './const/game.enum';
 import { useGameStore } from '@/stores/game';
 import { useGcStore } from '@/stores/gc';
 import { socket } from '@/socket';
@@ -64,7 +64,7 @@ import { socket } from '@/socket';
 const gameStore = useGameStore();
 const gcStore = useGcStore();
 const route = useRoute();
-const { flatSelectedLocations, activeUserId, isActiveUser, getMap } = storeToRefs(gameStore);
+const { flatSelectedLocations, activeUserId, isActiveUser, getMap, questionState } = storeToRefs(gameStore);
 const { clients } = storeToRefs(gcStore);
 gameStore.setMap(MapLocations);
 
