@@ -21,7 +21,7 @@ export class GameService implements OnModuleInit {
     },
     [GAME_STATUS.PREPARE]: {
       next: GAME_STATUS.CONTEST,
-      fn: (roomId: string) => this.prepare(roomId),
+      fn: (roomId: string) => this.positionSetting(roomId),
     },
     [GAME_STATUS.CONTEST]: {
       next: GAME_STATUS.BATTLE,
@@ -29,6 +29,7 @@ export class GameService implements OnModuleInit {
     },
     [GAME_STATUS.BATTLE]: {
       next: GAME_STATUS.CONTEST,
+      fn: (roomId: string) => this.positionSetting(roomId),
     },
     [GAME_STATUS.FINISH]: {
       next: GAME_STATUS.FINISH,
@@ -117,7 +118,7 @@ export class GameService implements OnModuleInit {
     }
   }
 
-  private async prepare(roomId: string) {
+  private async positionSetting(roomId: string) {
     const clientId = await this.gameUserService.popStack(roomId);
     if (!clientId) {
       this.setStatus(roomId, this.transitions[GAME_STATUS.PREPARE].next);
@@ -167,6 +168,7 @@ export class GameService implements OnModuleInit {
     { roomId, choice }: { roomId: string; choice: string },
   ) {
     await this.gameUserService.commitChoice(roomId, client.id, choice);
+    await this.gameUserService.popStack(roomId);
     const stack = await this.gameUserService.getLenUsersStack(roomId);
     if (!stack) {
       await this.finishContest(roomId);
@@ -175,14 +177,27 @@ export class GameService implements OnModuleInit {
   }
 
   private async finishContest(roomId: string) {
-    this.setStatus(roomId, this.transitions[GAME_STATUS.CONTEST].next);
+    const answer = await this.gameQuestionService.getAnswerQuestion(roomId);
+    const usersAnswers = await this.gameUserService.getChoices(roomId);
+    const userWhoRights = Object.entries(usersAnswers)
+      .map(([clientId, clientAnswer]) => answer === clientAnswer && clientId)
+      .filter(Boolean);
+
     this.sockets.to(roomId).emit('game', {
       method: 'finishContest',
       payload: {
-        answer: await this.gameQuestionService.getAnswerQuestion(roomId),
-        usersAnswers: await this.gameUserService.getChoices(roomId),
+        answer,
+        usersAnswers,
       },
     });
+    if (userWhoRights.length) {
+      await this.gameUserService.addUsersToStack(roomId, userWhoRights);
+      this.setStatus(roomId, this.transitions[GAME_STATUS.CONTEST].next);
+    }
+
+    setTimeout(() => {
+      this.nextTick(roomId);
+    }, 5000);
   }
 
   private nextTick(roomId: string) {
