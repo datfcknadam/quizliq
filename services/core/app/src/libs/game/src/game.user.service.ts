@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import { EventService } from 'src/libs/event/src';
 
 @Injectable()
-export default class GameUserService {
+export class GameUserService {
   private sockets: Server = null;
 
   constructor(private readonly eventService: EventService) {}
@@ -12,44 +12,58 @@ export default class GameUserService {
     this.sockets = sockets;
   }
 
-  public getSocketsInRoom(roomId: string): Set<string> {
+  public getClientsInRoom(roomId: string): string[] {
     const socketsMap = this.sockets.sockets.adapter;
-    return socketsMap.rooms.get(roomId);
-  }
-
-  public async nextActiveUser(roomId: string): Promise<string | false> {
-    try {
-      const sockets = this.getSocketsInRoom(roomId);
-      if (!sockets) {
-        this.setActiveUser(roomId, 0);
-        return false;
-      }
-      const users = [...sockets.values()];
-      const activeUser = await this.getActiveUser(roomId);
-      const activeUserIndex = users.findIndex(
-        (userId) => userId === activeUser,
-      );
-      if ([users.length - 1, -1].includes(activeUserIndex)) {
-        this.setActiveUser(roomId, users[0]);
-        return users[0];
-      }
-
-      this.setActiveUser(roomId, users[activeUserIndex + 1]);
-      return users[activeUserIndex];
-    } catch (e) {
-      console.error(e);
+    const sockets = socketsMap.rooms.get(roomId);
+    if (!sockets) {
+      return [];
     }
-  }
-
-  public async getActiveUser(roomId: string): Promise<string> {
-    return this.eventService.client.get(`game:${roomId}:activeUser`);
+    return [...sockets.values()];
   }
 
   public async setActiveUser(roomId: string, clientId: string | 0) {
-    this.eventService.client.set(`game:${roomId}:activeUser`, clientId);
     this.sockets.to(roomId).emit('game', {
       method: 'setActiveUser',
       payload: { clientId: clientId },
     });
+  }
+
+  public async addUsersToStack(roomId: string, users: string[]) {
+    await this.eventService.client.rPush(`game:${roomId}:stack`, users);
+    console.log(
+      await this.eventService.client.lRange(`game:${roomId}:stack`, 0, -1),
+    );
+  }
+
+  public async getLenUsersStack(roomId: string) {
+    return this.eventService.client.lLen(`game:${roomId}:stack`);
+  }
+
+  public async popStack(roomId: string) {
+    return this.eventService.client.lPop(`game:${roomId}:stack`);
+  }
+
+  public async removeUserStack(roomId: string, clientId: string) {
+    return this.eventService.client.lRem(`game:${roomId}:stack`, 0, clientId);
+  }
+
+  public async getUserStackByIndex(roomId: string, index: number) {
+    return this.eventService.client.lIndex(`game:${roomId}:stack`, index);
+  }
+
+  public async commitChoice(roomId: string, clientId: string, choice: string) {
+    await this.eventService.client.hSet(
+      `game:${roomId}:choice`,
+      clientId,
+      choice,
+    );
+  }
+
+  public async getChoices(roomId: string) {
+    const data = await this.eventService.client.hGetAll(
+      `game:${roomId}:choice`,
+    );
+    await this.eventService.client.del(`game:${roomId}:choice`);
+    return data;
   }
 }

@@ -395,7 +395,7 @@ export interface ApiQuizliqQuizliq extends Schema.CollectionType {
           localized: true;
         };
       }>;
-    question: Attribute.Text &
+    text: Attribute.Text &
       Attribute.Required &
       Attribute.Unique &
       Attribute.SetPluginOptions<{

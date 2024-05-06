@@ -1,7 +1,8 @@
-import { DynamicModule, Module } from '@nestjs/common';
+import { DynamicModule, Global, Module } from '@nestjs/common';
 import { API_TOKEN, API_URL } from './const/content.tokens';
 import { ContentService } from './content.service';
 
+@Global()
 @Module({})
 export class ContentModule {
   static forRoot(config: { token: string; url: string }): DynamicModule {
@@ -14,7 +15,7 @@ export class ContentModule {
         },
         {
           provide: API_URL,
-          useValue: config.url,
+          useValue: new URL(config.url),
         },
         ContentService,
       ],

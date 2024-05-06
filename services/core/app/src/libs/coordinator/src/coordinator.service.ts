@@ -44,7 +44,6 @@ export class CoordinatorService {
     client: Socket,
     { roomId }: { roomId: string },
   ): Promise<{
-    activeUserId: string;
     clients: { id: string; name: string }[];
   }> {
     await client.join(roomId);
@@ -58,7 +57,6 @@ export class CoordinatorService {
           id,
           ...this.names[index],
         })),
-        activeUserId: await this.gameService.getActiveUser(roomId),
         gameStatus: await this.gameService.getStatus(roomId),
       },
     };

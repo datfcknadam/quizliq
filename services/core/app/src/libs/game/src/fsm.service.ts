@@ -4,7 +4,7 @@ import { GAME_STATUS } from './game.const';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export default class StateService {
+export class StateService {
   // todo: Bad practice - refactor this
   private sockets: Server = null;
 
@@ -16,10 +16,6 @@ export default class StateService {
 
   public setState(roomId: string, status: GAME_STATUS) {
     this.eventService.client.set(`fsm:${roomId}:state`, status);
-    this.sockets.to(roomId).emit('game', {
-      method: 'setState',
-      payload: status,
-    });
   }
 
   public async getState(roomId: string): Promise<number> {

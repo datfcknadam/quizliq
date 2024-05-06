@@ -12,6 +12,14 @@ export default factories.createCoreController(
       await strapi.db.query('api::quizliq.quizliq').createMany({
         data: body,
       });
+      ctx.response.status = 201;
+      return;
+    },
+    async getRandom(ctx) {
+      const random = await strapi.service('api::quizliq.quizliq').getRandom(ctx.query.locale);
+      ctx.response.body = { data: random };
+      ctx.response.status = 200;
+      return;
     },
   }),
 );

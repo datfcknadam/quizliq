@@ -38,13 +38,13 @@ export class CoordinatorGateway implements OnModuleInit, OnGatewayConnection {
   }
 
   @SubscribeMessage('game')
-  gameEvents(
+  async gameEvents(
     @MessageBody() data: { method: string; payload: unknown },
     @ConnectedSocket() client: Socket,
-  ): WsResponse<unknown> {
+  ): Promise<WsResponse<unknown>> {
     return {
       event: 'game',
-      data: this.gameService.interface(data.method, client, data.payload),
+      data: await this.gameService.interface(data.method, client, data.payload),
     };
   }
 

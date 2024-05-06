@@ -12,6 +12,7 @@
       @focus="gameStore.focusLocation"
       @blur="gameStore.blurLocation"
     />
+    <GameQuestionDialog />
     <q-dialog
       model-value
       no-focus
@@ -54,6 +55,7 @@ import MapLocations from '@quizliq-maps/usa-half';
 import { CheckboxSvgMap } from 'vue3-svg-map';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import GameQuestionDialog from './components/GameQuestionDialog.vue';
 
 import { useGameStore } from '@/stores/game';
 import { useGcStore } from '@/stores/gc';

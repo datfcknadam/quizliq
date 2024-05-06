@@ -9,6 +9,9 @@ export const useGcStore = defineStore('gc', {
     inRoom: false,
     gameStatus: 0,
   }),
+  getters: {
+    currentClient: (state) => state.clients.get(socket.id), 
+  },
   actions: {
     bootstrap() {
       socket.connect();

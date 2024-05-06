@@ -46,7 +46,7 @@
         }
       }
     },
-    "question": {
+    "text": {
       "type": "text",
       "required": true,
       "unique": true,

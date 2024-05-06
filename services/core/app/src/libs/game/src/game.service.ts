@@ -2,8 +2,9 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { EventService } from 'src/libs/event/src';
 import { GAME_STATUS } from './game.const';
-import StateService from './fsm.service';
-import GameUserService from './game.user.service';
+import { StateService } from './fsm.service';
+import { GameUserService } from './game.user.service';
+import { GameQuestionService } from './game.question.service';
 
 @Injectable()
 export class GameService implements OnModuleInit {
@@ -11,6 +12,7 @@ export class GameService implements OnModuleInit {
   private readonly methodsMap = {
     startGame: this.startGame,
     selectPosition: this.selectPosition,
+    selectChoice: this.selectChoice,
   };
 
   private transitions = {
@@ -26,7 +28,7 @@ export class GameService implements OnModuleInit {
       fn: (roomId: string) => this.contest(roomId),
     },
     [GAME_STATUS.BATTLE]: {
-      next: GAME_STATUS.FINISH,
+      next: GAME_STATUS.CONTEST,
     },
     [GAME_STATUS.FINISH]: {
       next: GAME_STATUS.FINISH,
@@ -37,12 +39,14 @@ export class GameService implements OnModuleInit {
     private eventService: EventService,
     private fsmService: StateService,
     private gameUserService: GameUserService,
+    private gameQuestionService: GameQuestionService,
   ) {}
 
   public provideSockets(sockets: Server) {
     this.sockets = sockets;
     this.fsmService.provideSockets(sockets);
     this.gameUserService.provideSocktes(sockets);
+    this.gameQuestionService.provideSockets(sockets);
   }
 
   public onModuleInit() {
@@ -56,9 +60,9 @@ export class GameService implements OnModuleInit {
     );
   }
 
-  public interface(method: string, client: Socket, payload: unknown) {
+  public async interface(method: string, client: Socket, payload: unknown) {
     // todo: validate types
-    const data = this.methodsMap[method].call(this, client, payload);
+    const data = await this.methodsMap[method].call(this, client, payload);
     return {
       method,
       payload: data,
@@ -66,33 +70,43 @@ export class GameService implements OnModuleInit {
   }
 
   public async clientLeaveGame(roomId: string, client: Socket) {
-    const activeUser = await this.gameUserService.getActiveUser(roomId);
+    const activeUser = await this.gameUserService.getUserStackByIndex(
+      roomId,
+      0,
+    );
     if (activeUser !== client.id) {
       return;
     }
-    this.gameUserService.nextActiveUser(roomId);
+    await this.gameUserService.removeUserStack(roomId, client.id);
+    this.gameUserService.setActiveUser(
+      roomId,
+      await this.gameUserService.popStack(roomId),
+    );
   }
 
   public async clientJoinGame(roomId: string, clientId: string) {
-    const activeUser = await this.gameUserService.getActiveUser(roomId);
+    const activeUser = await this.gameUserService.getUserStackByIndex(
+      roomId,
+      0,
+    );
     if (!activeUser) {
       this.gameUserService.setActiveUser(roomId, clientId);
     }
   }
 
-  public getActiveUser(roomId: string): Promise<string> {
-    return this.gameUserService.getActiveUser(roomId);
-  }
-
   public setStatus(roomId: string, status: GAME_STATUS): void {
     this.fsmService.setState(roomId, status);
+    this.sockets.to(roomId).emit('game', {
+      method: 'setState',
+      payload: status,
+    });
   }
 
   public async getStatus(roomId: string): Promise<GAME_STATUS> {
     return this.fsmService.getState(roomId);
   }
 
-  private async tick(roomId) {
+  private async tick(roomId: string) {
     const state = await this.fsmService.getState(roomId);
     const transition = this.transitions[state];
     if (!transition) {
@@ -104,33 +118,38 @@ export class GameService implements OnModuleInit {
   }
 
   private async prepare(roomId: string) {
-    const steps = await this.eventService.client.incr(`game:${roomId}:step`);
-    const sockets = this.gameUserService.getSocketsInRoom(roomId);
-    if (steps >= sockets.size) {
+    const clientId = await this.gameUserService.popStack(roomId);
+    if (!clientId) {
       this.setStatus(roomId, this.transitions[GAME_STATUS.PREPARE].next);
+      this.gameUserService.addUsersToStack(
+        roomId,
+        this.gameUserService.getClientsInRoom(roomId),
+      );
+      this.nextTick(roomId);
+      return;
     }
-    this.gameUserService.nextActiveUser(roomId);
+    this.gameUserService.setActiveUser(roomId, clientId);
   }
 
   private async contest(roomId: string) {
-    console.log('contest', roomId);
+    await this.gameQuestionService.sendQuestion(roomId);
   }
 
   private startGame(client: Socket, { roomId }: { roomId: string }) {
     client.to(roomId).emit('game', {
       method: 'startGame',
-      payload: { roomId, gameStatus: GAME_STATUS.PREPARE },
+      payload: { roomId },
     });
     this.setStatus(roomId, GAME_STATUS.PREPARE);
+    this.gameUserService.addUsersToStack(
+      roomId,
+      this.gameUserService.getClientsInRoom(roomId),
+    );
     this.nextTick(roomId);
     return { roomId, gameStatus: GAME_STATUS.PREPARE };
   }
 
-  private nextTick(roomId: string) {
-    this.eventService.pub.publish('game:tick', Buffer.from(roomId));
-  }
-
-  private selectPosition(
+  private async selectPosition(
     client: Socket,
     { roomId, position }: { roomId: string; position: string },
   ) {
@@ -141,5 +160,32 @@ export class GameService implements OnModuleInit {
     });
     this.nextTick(roomId);
     return { position, clientId: client.id };
+  }
+
+  private async selectChoice(
+    client: Socket,
+    { roomId, choice }: { roomId: string; choice: string },
+  ) {
+    await this.gameUserService.commitChoice(roomId, client.id, choice);
+    const stack = await this.gameUserService.getLenUsersStack(roomId);
+    if (!stack) {
+      await this.finishContest(roomId);
+      return;
+    }
+  }
+
+  private async finishContest(roomId: string) {
+    this.setStatus(roomId, this.transitions[GAME_STATUS.CONTEST].next);
+    this.sockets.to(roomId).emit('game', {
+      method: 'finishContest',
+      payload: {
+        answer: await this.gameQuestionService.getAnswerQuestion(roomId),
+        usersAnswers: await this.gameUserService.getChoices(roomId),
+      },
+    });
+  }
+
+  private nextTick(roomId: string) {
+    this.eventService.pub.publish('game:tick', Buffer.from(roomId));
   }
 }
