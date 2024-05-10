@@ -30,9 +30,6 @@ export class GameUserService {
 
   public async addUsersToStack(roomId: string, users: string[]) {
     await this.eventService.client.rPush(`game:${roomId}:stack`, users);
-    console.log(
-      await this.eventService.client.lRange(`game:${roomId}:stack`, 0, -1),
-    );
   }
 
   public async getLenUsersStack(roomId: string) {
@@ -43,6 +40,10 @@ export class GameUserService {
     return this.eventService.client.lPop(`game:${roomId}:stack`);
   }
 
+  public async cleanUserStack(roomId: string) {
+    return this.eventService.client.del(`game:${roomId}:stack`);
+  }
+
   public async removeUserStack(roomId: string, clientId: string) {
     return this.eventService.client.lRem(`game:${roomId}:stack`, 0, clientId);
   }
@@ -51,12 +52,15 @@ export class GameUserService {
     return this.eventService.client.lIndex(`game:${roomId}:stack`, index);
   }
 
-  public async commitChoice(roomId: string, clientId: string, choice: string) {
-    await this.eventService.client.hSet(
-      `game:${roomId}:choice`,
-      clientId,
-      choice,
-    );
+  public async commitChoice(
+    roomId: string,
+    clientId: string,
+    data: { choice: string; responseTime: number },
+  ) {
+    await this.eventService.client.hSet(`game:${roomId}:choice:${clientId}`, {
+      choice: data.choice,
+      responseTime: data.responseTime,
+    });
   }
 
   public async getChoices(roomId: string) {

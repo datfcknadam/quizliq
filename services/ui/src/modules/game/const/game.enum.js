@@ -2,8 +2,9 @@ export const GAME_STATE = {
   LOBBY: 0,
   PREPARE: 1,
   CONTEST: 2,
-  BATTLE: 3,
-  FINISH: 4,
+  LAND_GRAB: 3,
+  BATTLE: 4,
+  FINISH: 5,
 }
 
 export const QUESTION_STATE = {

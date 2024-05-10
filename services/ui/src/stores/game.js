@@ -3,7 +3,8 @@ import { socket } from '@/socket';
 import router from '@/router';
 import { useGcStore } from './gc';
 import usa from '@/modules/game/const/game.map.entity';
-import { QUESTION_STATE, QUESTION_TYPE } from '@/modules/game/const/game.enum';
+import { GAME_STATE, QUESTION_STATE, QUESTION_TYPE } from '@/modules/game/const/game.enum';
+import { useConnectionStore } from './connection';
 
 export const useGameStore = defineStore('game', {
   state: () => ({
@@ -13,28 +14,85 @@ export const useGameStore = defineStore('game', {
     neightboursLocations: usa,
     question: null,
     questionState: QUESTION_STATE.INNACTIVE,
+    gameState: GAME_STATE.LOBBY,
     selectedChoice: null,
     time: null,
     timer: null,
     answer: null,
     userAnswers: null,
+    responseTimeStart: null,
   }),
   getters: {
-    isActiveUser: (state) => state.activeUserId === socket.id,
+    currentUserId: () => {
+      const connection = useConnectionStore();
+      return connection.socketId;
+    },
+    isActiveUser: function(state) { return state.activeUserId === this.currentUserId },
     flatSelectedLocations: state => [...state.selectedLocations.keys()],
-    getMap: (state) => {
+    getAvailableLocations: function(state) {
+      const availableLocations = new Set();
+      const notAvailableLocations = new Set();
+      state.map.locations.forEach(({ id }) => {
+        const clientId = state.selectedLocations.get(id);
+        const locationAndNeightbours = state.neightboursLocations[id].concat(id);
+
+        if (state.gameState === GAME_STATE.PREPARE) {
+          if (clientId && clientId !== this.currentUserId) {
+            locationAndNeightbours.forEach(location => {
+              notAvailableLocations.add(location);
+              availableLocations.delete(location);
+            });
+            return;
+          }
+          locationAndNeightbours.map(neigthbours => {
+            if (notAvailableLocations.has(neigthbours)) {
+              return;
+            }
+            availableLocations.add(neigthbours)
+          });
+        } 
+        if (clientId === this.currentUserId) {
+          locationAndNeightbours.map(neigthbours => {
+            if (notAvailableLocations.has(neigthbours)) {
+              return;
+            }
+            availableLocations.add(neigthbours)
+          });
+        }
+      });
+      return availableLocations;
+    },
+    isAvailableLocation: function (state) {
+      return (locationId) => {
+        
+        return this.getAvailableLocations.has(locationId);
+      }
+    },
+    getMap(state) {
       const gcStore = useGcStore();
       return ({
         ...state.map,
         locations: state.map.locations.map(location => {
+          const styleClasses = [];
           const clientId = state.selectedLocations.get(location.id);
-          if (!clientId) {
-            return location;
+
+          if (!this.getAvailableLocations.has(location.id)) {
+            styleClasses.push('disabled')
           }
+
+          if (!clientId) {
+            return {
+              ...location,
+              class: styleClasses, 
+            };
+          }
+
           const { color } = gcStore.clients.get(clientId);
+          
+          styleClasses.push(`fill-${color}`);
           return {
             ...location,
-            class: `fill-${color}`,
+            class: styleClasses,
           }
         }),
       });
@@ -64,14 +122,17 @@ export const useGameStore = defineStore('game', {
     startGame(roomId) {
       socket.emit('game', { method: 'startGame', payload: { roomId } });
     },
-    startGameRes({ roomId, gameStatus }) {
+    startGameRes({ roomId, gameState }) {
       if (roomId) {
         router.push({ name: 'Game', params: { id: roomId } });
-        this.gameStatus = gameStatus;
+        this.gameState = gameState;
       }
     },
     selectPosition(position) {
-      if (!this.isActiveUser || !position) {
+      if (!this.isActiveUser
+          || !position
+          || !this.getAvailableLocations.has(position)
+          || this.selectedLocations.get(position) === this.currentUserId) {
         return;
       }
       socket.emit('game', {
@@ -85,10 +146,12 @@ export const useGameStore = defineStore('game', {
     selectPositionRes({ position, clientId }) {
       this.selectedLocations.set(position, clientId);
     },
-    setActiveUserRes({ clientId, gameStatus }) {
+    setActiveUserRes({ clientId }) {
       this.activeUserId = clientId;
-      this.gameStatus = gameStatus;
       this.questionState = QUESTION_STATE.INNACTIVE;
+    },
+    setStateRes(gameState) {
+      this.gameState = gameState;
     },
     setMap(map) {
       this.map = map;
@@ -98,7 +161,11 @@ export const useGameStore = defineStore('game', {
       this.selectedChoice = choice;
       socket.emit('game', {
         method: 'selectChoice',
-        payload: { choice, roomId: router.currentRoute.value.params.id }
+        payload: {
+          choice,
+          roomId: router.currentRoute.value.params.id,
+          responseRate: Date.now() - this.responseTimeStart,
+         },
       });
     },
     sendQuestionRes({ question, options }) {
@@ -106,6 +173,7 @@ export const useGameStore = defineStore('game', {
       ? { ...question, choices: JSON.parse(question.choices)} : question;
       this.selectedChoice = null;
       this.answer = null;
+      this.responseTimeStart = Date.now();
       this.startTimer(options.time);
       this.questionState = QUESTION_STATE.ACTIVE;
       this.question = preparedQuestion;

@@ -1,10 +1,13 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+
 import { EventService } from 'src/libs/event/src';
-import { GAME_STATUS } from './game.const';
-import { StateService } from './fsm.service';
-import { GameUserService } from './game.user.service';
-import { GameQuestionService } from './game.question.service';
+import { GAME_STATE } from './const/game.const';
+
+import { GameStateService } from './services/game.state.service';
+import { GameUserService } from './services/game.user.service';
+import { GameQuestionService } from './services/game.question.service';
+import { GamePositionService } from './services/game.position.service';
 
 @Injectable()
 export class GameService implements OnModuleInit {
@@ -15,39 +18,44 @@ export class GameService implements OnModuleInit {
     selectChoice: this.selectChoice,
   };
 
-  private transitions = {
-    [GAME_STATUS.LOBBY]: {
-      next: GAME_STATUS.PREPARE,
+  private readonly transitions = {
+    [GAME_STATE.LOBBY]: {
+      next: GAME_STATE.PREPARE,
     },
-    [GAME_STATUS.PREPARE]: {
-      next: GAME_STATUS.CONTEST,
+    [GAME_STATE.PREPARE]: {
+      next: GAME_STATE.CONTEST,
       fn: (roomId: string) => this.positionSetting(roomId),
     },
-    [GAME_STATUS.CONTEST]: {
-      next: GAME_STATUS.BATTLE,
+    [GAME_STATE.CONTEST]: {
       fn: (roomId: string) => this.contest(roomId),
     },
-    [GAME_STATUS.BATTLE]: {
-      next: GAME_STATUS.CONTEST,
+    [GAME_STATE.LAND_GRAB]: {
+      next: GAME_STATE.CONTEST,
       fn: (roomId: string) => this.positionSetting(roomId),
     },
-    [GAME_STATUS.FINISH]: {
-      next: GAME_STATUS.FINISH,
+    [GAME_STATE.BATTLE]: {
+      next: GAME_STATE.CONTEST,
+      fn: (roomId: string) => this.contest(roomId),
+    },
+    [GAME_STATE.FINISH]: {
+      next: GAME_STATE.FINISH,
     },
   };
 
   constructor(
     private eventService: EventService,
-    private fsmService: StateService,
+    private gameStateService: GameStateService,
     private gameUserService: GameUserService,
     private gameQuestionService: GameQuestionService,
+    private gamePositionService: GamePositionService,
   ) {}
 
   public provideSockets(sockets: Server) {
     this.sockets = sockets;
-    this.fsmService.provideSockets(sockets);
+    this.gameStateService.provideSockets(sockets);
     this.gameUserService.provideSocktes(sockets);
     this.gameQuestionService.provideSockets(sockets);
+    this.gamePositionService.provideSockets(sockets);
   }
 
   public onModuleInit() {
@@ -91,24 +99,20 @@ export class GameService implements OnModuleInit {
       0,
     );
     if (!activeUser) {
-      this.gameUserService.setActiveUser(roomId, clientId);
+      await this.gameUserService.setActiveUser(roomId, clientId);
     }
   }
 
-  public setStatus(roomId: string, status: GAME_STATUS): void {
-    this.fsmService.setState(roomId, status);
-    this.sockets.to(roomId).emit('game', {
-      method: 'setState',
-      payload: status,
-    });
+  public setStatus(roomId: string, status: GAME_STATE): void {
+    this.gameStateService.setState(roomId, status);
   }
 
-  public async getStatus(roomId: string): Promise<GAME_STATUS> {
-    return this.fsmService.getState(roomId);
+  public async getStatus(roomId: string): Promise<GAME_STATE> {
+    return this.gameStateService.getState(roomId);
   }
 
-  private async tick(roomId: string) {
-    const state = await this.fsmService.getState(roomId);
+  private async tick(roomId: string): Promise<void> {
+    const state = await this.gameStateService.getState(roomId);
     const transition = this.transitions[state];
     if (!transition) {
       return;
@@ -118,21 +122,24 @@ export class GameService implements OnModuleInit {
     }
   }
 
-  private async positionSetting(roomId: string) {
+  private async positionSetting(roomId: string): Promise<void> {
     const clientId = await this.gameUserService.popStack(roomId);
-    if (!clientId) {
-      this.setStatus(roomId, this.transitions[GAME_STATUS.PREPARE].next);
-      this.gameUserService.addUsersToStack(
-        roomId,
-        this.gameUserService.getClientsInRoom(roomId),
-      );
-      this.nextTick(roomId);
+    if (clientId) {
+      this.gameUserService.setActiveUser(roomId, clientId);
       return;
     }
-    this.gameUserService.setActiveUser(roomId, clientId);
+    const gameState = (await this.getStatus(roomId)) as
+      | GAME_STATE.PREPARE
+      | GAME_STATE.LAND_GRAB;
+    this.setStatus(roomId, this.transitions[gameState].next);
+    this.gameUserService.addUsersToStack(
+      roomId,
+      this.gameUserService.getClientsInRoom(roomId),
+    );
+    this.nextTick(roomId);
   }
 
-  private async contest(roomId: string) {
+  private async contest(roomId: string): Promise<void> {
     await this.gameQuestionService.sendQuestion(roomId);
   }
 
@@ -141,48 +148,96 @@ export class GameService implements OnModuleInit {
       method: 'startGame',
       payload: { roomId },
     });
-    this.setStatus(roomId, GAME_STATUS.PREPARE);
+    this.setStatus(roomId, GAME_STATE.PREPARE);
     this.gameUserService.addUsersToStack(
       roomId,
       this.gameUserService.getClientsInRoom(roomId),
     );
     this.nextTick(roomId);
-    return { roomId, gameStatus: GAME_STATUS.PREPARE };
+    return { roomId, gameState: GAME_STATE.PREPARE };
   }
 
   private async selectPosition(
     client: Socket,
     { roomId, position }: { roomId: string; position: string },
   ) {
-    this.eventService.client.sAdd(`game:${roomId}:${position}`, client.id);
-    client.to(roomId).emit('game', {
-      method: 'selectPosition',
-      payload: { position, clientId: client.id },
+    const existClient = await this.gamePositionService.getClientByPosition(
+      roomId,
+      position,
+    );
+    if (!existClient) {
+      this.gamePositionService.setPosition(roomId, position, {
+        clientId: client.id,
+      });
+      this.nextTick(roomId);
+      return;
+    }
+    this.gamePositionService.setPosition(roomId, position, {
+      clientId: existClient,
+      rivalClientId: client.id,
     });
+    await this.gameUserService.cleanUserStack(roomId);
+    await this.gameUserService.addUsersToStack(roomId, [
+      existClient,
+      client.id,
+    ]);
+    this.gamePositionService.setDisputedArea(roomId, position);
+    this.setStatus(roomId, GAME_STATE.BATTLE);
     this.nextTick(roomId);
-    return { position, clientId: client.id };
   }
 
   private async selectChoice(
     client: Socket,
-    { roomId, choice }: { roomId: string; choice: string },
+    { roomId, choice, time }: { roomId: string; choice: string; time: number },
   ) {
     await this.gameUserService.commitChoice(roomId, client.id, choice);
     await this.gameUserService.popStack(roomId);
     const stack = await this.gameUserService.getLenUsersStack(roomId);
     if (!stack) {
       await this.finishContest(roomId);
+      this.nextTick(roomId, 1000);
       return;
     }
   }
 
   private async finishContest(roomId: string) {
+    const status = await this.getStatus(roomId);
     const answer = await this.gameQuestionService.getAnswerQuestion(roomId);
     const usersAnswers = await this.gameUserService.getChoices(roomId);
-    const userWhoRights = Object.entries(usersAnswers)
+    const allUsers = this.gameUserService.getClientsInRoom(roomId);
+    const usersWhoRights = Object.entries(usersAnswers)
       .map(([clientId, clientAnswer]) => answer === clientAnswer && clientId)
       .filter(Boolean);
 
+    this.emitFinishContest(roomId, answer, usersAnswers);
+
+    // todo: refactor!
+    if (status === GAME_STATE.BATTLE) {
+      if (usersWhoRights.length === 1) {
+        this.setStatus(roomId, GAME_STATE.LAND_GRAB);
+        this.gamePositionService.setPosition(
+          roomId,
+          await this.gamePositionService.getDisputedArea(roomId),
+          { clientId: usersWhoRights[0] },
+        );
+      }
+      await this.gameUserService.addUsersToStack(roomId, allUsers);
+      return;
+    }
+
+    if (usersWhoRights.length) {
+      await this.gameUserService.addUsersToStack(roomId, usersWhoRights);
+      this.setStatus(roomId, GAME_STATE.LAND_GRAB);
+      return;
+    }
+    await this.gameUserService.addUsersToStack(roomId, allUsers);
+  }
+
+  private emitFinishContest(
+    roomId: string,
+    answer: string,
+    usersAnswers: Record<string, string>,
+  ) {
     this.sockets.to(roomId).emit('game', {
       method: 'finishContest',
       payload: {
@@ -190,17 +245,11 @@ export class GameService implements OnModuleInit {
         usersAnswers,
       },
     });
-    if (userWhoRights.length) {
-      await this.gameUserService.addUsersToStack(roomId, userWhoRights);
-      this.setStatus(roomId, this.transitions[GAME_STATUS.CONTEST].next);
-    }
-
-    setTimeout(() => {
-      this.nextTick(roomId);
-    }, 5000);
   }
 
-  private nextTick(roomId: string) {
-    this.eventService.pub.publish('game:tick', Buffer.from(roomId));
+  private nextTick(roomId: string, timeout = 0) {
+    setTimeout(() => {
+      this.eventService.pub.publish('game:tick', Buffer.from(roomId));
+    }, timeout);
   }
 }

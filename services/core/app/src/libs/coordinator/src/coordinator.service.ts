@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
 import { Socket } from 'socket.io';
 import { GameService } from 'src/libs/game/src';
-import { GAME_STATUS } from 'src/libs/game/src/game.const';
+import { GAME_STATE } from 'src/libs/game/src/const/game.const';
 
 @Injectable()
 export class CoordinatorService {
@@ -36,7 +36,7 @@ export class CoordinatorService {
   // todo: switch sockets to http
   private createRoom(): { roomId: string } {
     const roomId = uuid();
-    this.gameService.setStatus(roomId, GAME_STATUS.LOBBY);
+    this.gameService.setStatus(roomId, GAME_STATE.LOBBY);
     return { roomId };
   }
 
@@ -57,7 +57,7 @@ export class CoordinatorService {
           id,
           ...this.names[index],
         })),
-        gameStatus: await this.gameService.getStatus(roomId),
+        gameState: await this.gameService.getStatus(roomId),
       },
     };
     client.to(roomId).emit('gc', result);

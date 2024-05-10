@@ -24,7 +24,7 @@ export class CoordinatorGateway implements OnModuleInit, OnGatewayConnection {
   ) {}
 
   @WebSocketServer()
-  server: Server;
+  private readonly server: Server;
 
   @SubscribeMessage('gc')
   async gcEvents(

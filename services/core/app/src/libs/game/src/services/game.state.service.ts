@@ -1,10 +1,10 @@
 import { Server } from 'socket.io';
 import { EventService } from 'src/libs/event/src';
-import { GAME_STATUS } from './game.const';
+import { GAME_STATE } from '../const/game.const';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class StateService {
+export class GameStateService {
   // todo: Bad practice - refactor this
   private sockets: Server = null;
 
@@ -14,8 +14,12 @@ export class StateService {
     this.sockets = sockets;
   }
 
-  public setState(roomId: string, status: GAME_STATUS) {
+  public setState(roomId: string, status: GAME_STATE) {
     this.eventService.client.set(`fsm:${roomId}:state`, status);
+    this.sockets.to(roomId).emit('game', {
+      method: 'setState',
+      payload: status,
+    });
   }
 
   public async getState(roomId: string): Promise<number> {
