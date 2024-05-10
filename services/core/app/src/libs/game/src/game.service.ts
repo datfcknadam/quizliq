@@ -188,9 +188,16 @@ export class GameService implements OnModuleInit {
 
   private async selectChoice(
     client: Socket,
-    { roomId, choice, time }: { roomId: string; choice: string; time: number },
+    {
+      roomId,
+      choice,
+      responseTime,
+    }: { roomId: string; choice: string; responseTime: number },
   ) {
-    await this.gameUserService.commitChoice(roomId, client.id, choice);
+    await this.gameUserService.commitChoice(roomId, client.id, {
+      choice,
+      responseTime,
+    });
     await this.gameUserService.popStack(roomId);
     const stack = await this.gameUserService.getLenUsersStack(roomId);
     if (!stack) {
