@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { v4 as uuid } from 'uuid';
 import { Socket } from 'socket.io';
 import { GameService } from 'src/libs/game/src';
 import { GAME_STATE } from 'src/libs/game/src/const/game.const';
@@ -35,7 +34,7 @@ export class CoordinatorService {
 
   // todo: switch sockets to http
   private createRoom(): { roomId: string } {
-    const roomId = uuid();
+    const roomId = crypto.randomUUID();
     this.gameService.setStatus(roomId, GAME_STATE.LOBBY);
     return { roomId };
   }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Server } from 'socket.io';
 import { EventService } from 'src/libs/event/src';
+import { Position } from '../interfaces/game.position.interface';
 
 @Injectable()
 export class GamePositionService {
@@ -12,33 +13,66 @@ export class GamePositionService {
     this.sockets = sockets;
   }
 
-  public getClientByPosition(
+  public async getPosition(
     roomId: string,
-    position: string,
-  ): Promise<string> {
-    return this.eventService.client.get(`game:${roomId}:${position}`);
+    positionId: string,
+  ): Promise<Position> {
+    const position = await this.eventService.client.hGet(
+      `game:${roomId}:position`,
+      positionId,
+    );
+    return JSON.parse(position);
   }
 
-  public setPosition(
+  public async setPosition(
     roomId: string,
     position: string,
-    { clientId, rivalClientId }: { clientId: string; rivalClientId?: string },
+    { userId, isCapital, health }: Position,
   ) {
-    this.eventService.client.set(`game:${roomId}:${position}`, clientId);
+    const data = {
+      userId,
+      isCapital: isCapital || false,
+      health: health || 1,
+    };
+    await this.eventService.client.hSet(
+      `game:${roomId}:position`,
+      position,
+      JSON.stringify(data),
+    );
     this.sockets.to(roomId).emit('game', {
       method: 'selectPosition',
-      payload: { position, clientId, rivalClientId },
+      payload: { position, ...data },
     });
   }
 
-  public async setDisputedArea(
+  public async setDisput(
     roomId: string,
     position: string,
+    { userId, rivaluserId }: { userId: string; rivaluserId: string },
   ): Promise<void> {
-    await this.eventService.client.set(`game:${roomId}:disputedArea`, position);
+    await this.eventService.client.hSet(`game:${roomId}:disput`, {
+      position,
+      users: JSON.stringify({
+        userId,
+        rivaluserId,
+      }),
+    });
+    this.sockets.to(roomId).emit('game', {
+      method: 'setDisput',
+      payload: { position, userId, rivaluserId },
+    });
   }
 
-  public async getDisputedArea(roomId: string): Promise<string> {
-    return this.eventService.client.get(`game:${roomId}:disputedArea`);
+  public async getDisput(roomId: string): Promise<{
+    users: { userId: string; rivaluserId: string };
+    position: string;
+  }> {
+    const { users, position } = await this.eventService.client.hGetAll(
+      `game:${roomId}:disput`,
+    );
+    return {
+      users: JSON.parse(users),
+      position,
+    };
   }
 }

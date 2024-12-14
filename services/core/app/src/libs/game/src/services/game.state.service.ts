@@ -15,7 +15,7 @@ export class GameStateService {
   }
 
   public setState(roomId: string, status: GAME_STATE) {
-    this.eventService.client.set(`fsm:${roomId}:state`, status);
+    this.eventService.client.set(`game:${roomId}:state`, status);
     this.sockets.to(roomId).emit('game', {
       method: 'setState',
       payload: status,
@@ -23,6 +23,6 @@ export class GameStateService {
   }
 
   public async getState(roomId: string): Promise<number> {
-    return Number(await this.eventService.client.get(`fsm:${roomId}:state`));
+    return Number(await this.eventService.client.get(`game:${roomId}:state`));
   }
 }

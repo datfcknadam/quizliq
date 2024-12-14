@@ -6,6 +6,7 @@ import { GameUserService } from './services/game.user.service';
 import { ContentModule } from 'src/libs/content/src';
 import { GameQuestionService } from './services/game.question.service';
 import { GamePositionService } from './services/game.position.service';
+import { GamePoolService } from './services/game.pool.service';
 
 @Module({
   providers: [
@@ -14,6 +15,7 @@ import { GamePositionService } from './services/game.position.service';
     GameUserService,
     GameQuestionService,
     GamePositionService,
+    GamePoolService,
   ],
   exports: [GameService],
   imports: [EventModule, ContentModule],

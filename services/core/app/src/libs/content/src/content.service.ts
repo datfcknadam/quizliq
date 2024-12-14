@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { API_TOKEN, API_URL } from './const/content.tokens';
-import { fetch } from 'undici';
+import { request } from 'undici';
 import * as qs from 'qs';
 
 @Injectable()
@@ -12,13 +12,25 @@ export class ContentService {
     private readonly apiUrl: URL,
   ) {}
 
+  async sendRate(questionId: number, good: boolean) {
+    const { url, headers } = this.buildRequest('question-rates');
+    await request(url, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        good,
+        quizliq: questionId,
+      }),
+    });
+  }
+
   async getRandom(locale?: string): Promise<{ correct: string }> {
     const { url, headers } = this.buildRequest('quizliqs/random', { locale });
-    const res = await fetch(url, {
+    const { body } = await request(url, {
       headers,
       method: 'GET',
     });
-    const { data } = (await res.json()) as { data: { correct: string } };
+    const { data } = (await body.json()) as { data: { correct: string } };
     return data;
   }
 

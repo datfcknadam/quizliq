@@ -1,0 +1,25 @@
+{
+  "kind": "collectionType",
+  "collectionName": "question_rates",
+  "info": {
+    "singularName": "question-rate",
+    "pluralName": "question-rates",
+    "displayName": "question_rate"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "good": {
+      "type": "boolean",
+      "required": true
+    },
+    "quizliq": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::quizliq.quizliq",
+      "inversedBy": "question_rates"
+    }
+  }
+}

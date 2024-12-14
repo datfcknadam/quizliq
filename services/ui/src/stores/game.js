@@ -21,6 +21,7 @@ export const useGameStore = defineStore('game', {
     answer: null,
     userAnswers: null,
     responseTimeStart: null,
+    disput: [],
   }),
   getters: {
     currentUserId: () => {
@@ -33,11 +34,11 @@ export const useGameStore = defineStore('game', {
       const availableLocations = new Set();
       const notAvailableLocations = new Set();
       state.map.locations.forEach(({ id }) => {
-        const clientId = state.selectedLocations.get(id);
+        const userId = state.selectedLocations.get(id);
         const locationAndNeightbours = state.neightboursLocations[id].concat(id);
 
         if (state.gameState === GAME_STATE.PREPARE) {
-          if (clientId && clientId !== this.currentUserId) {
+          if (userId && userId !== this.currentUserId) {
             locationAndNeightbours.forEach(location => {
               notAvailableLocations.add(location);
               availableLocations.delete(location);
@@ -51,7 +52,7 @@ export const useGameStore = defineStore('game', {
             availableLocations.add(neigthbours)
           });
         } 
-        if (clientId === this.currentUserId) {
+        if (userId === this.currentUserId) {
           locationAndNeightbours.map(neigthbours => {
             if (notAvailableLocations.has(neigthbours)) {
               return;
@@ -74,20 +75,20 @@ export const useGameStore = defineStore('game', {
         ...state.map,
         locations: state.map.locations.map(location => {
           const styleClasses = [];
-          const clientId = state.selectedLocations.get(location.id);
+          const userId = state.selectedLocations.get(location.id);
 
           if (!this.getAvailableLocations.has(location.id)) {
             styleClasses.push('disabled')
           }
 
-          if (!clientId) {
+          if (!userId) {
             return {
               ...location,
               class: styleClasses, 
             };
           }
 
-          const { color } = gcStore.clients.get(clientId);
+          const { color } = gcStore.clients.get(userId);
           
           styleClasses.push(`fill-${color}`);
           return {
@@ -143,11 +144,11 @@ export const useGameStore = defineStore('game', {
         },
       });
     },
-    selectPositionRes({ position, clientId }) {
-      this.selectedLocations.set(position, clientId);
+    selectPositionRes({ position, userId }) {
+      this.selectedLocations.set(position, userId);
     },
-    setActiveUserRes({ clientId }) {
-      this.activeUserId = clientId;
+    setActiveUserRes({ userId }) {
+      this.activeUserId = userId;
       this.questionState = QUESTION_STATE.INNACTIVE;
     },
     setStateRes(gameState) {
@@ -156,7 +157,7 @@ export const useGameStore = defineStore('game', {
     setMap(map) {
       this.map = map;
     },
-    setChoice(choice) {
+    selectChoice(choice) {
       this.stopTimer();
       this.selectedChoice = choice;
       socket.emit('game', {
@@ -174,15 +175,17 @@ export const useGameStore = defineStore('game', {
       this.selectedChoice = null;
       this.answer = null;
       this.responseTimeStart = Date.now();
+      this.stopTimer();
       this.startTimer(options.time);
-      this.questionState = QUESTION_STATE.ACTIVE;
+      const isForCurrentUser = this.disput.findIndex(id => id === this.currentUserId) !== -1;
+      this.questionState = this.gameState !== GAME_STATE.BATTLE || isForCurrentUser ? QUESTION_STATE.ACTIVE : QUESTION_STATE.ONLY_SHOW;
       this.question = preparedQuestion;
     },
     startTimer(time) {
       this.time = time;
       this.timer = setInterval(() => {
         if (this.time <= 0) {
-          this.setChoice(null);
+          this.selectChoice(0);
         }
         this.time -= 1000;
       }, 1000);
@@ -196,5 +199,8 @@ export const useGameStore = defineStore('game', {
       this.answer = answer;
       this.usersAnswers = usersAnswers;
     },
+    setDisputRes({ userId, rivaluserId }) {
+      this.disput = [userId, rivaluserId];
+    }
   },
 });

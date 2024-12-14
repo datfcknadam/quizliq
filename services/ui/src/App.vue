@@ -1,8 +1,11 @@
 <template>
   <q-layout view="lHh lpr lFf" class="shadow-2 rounded-borders">
-    <q-header elevated bordered class="bg-grey-3 text-primary">
-      <q-toolbar>
-        <q-toolbar-title> Quizliq </q-toolbar-title>
+    <q-header elevated bordered>
+      <q-toolbar class="bg-primary glossy">
+        <q-avatar>
+         <img src="logo.svg">
+        </q-avatar>
+        <q-toolbar-title>Quizliq</q-toolbar-title>
       </q-toolbar>
     </q-header>
 

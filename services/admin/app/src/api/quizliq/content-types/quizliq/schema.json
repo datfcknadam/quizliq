@@ -37,7 +37,7 @@
         "geography",
         "history",
         "science",
-        "entertainments"
+        "entertainment"
       ],
       "required": true,
       "pluginOptions": {
@@ -86,6 +86,12 @@
           "localized": false
         }
       }
+    },
+    "question_rates": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::question-rate.question-rate",
+      "mappedBy": "quizliq"
     }
   }
 }

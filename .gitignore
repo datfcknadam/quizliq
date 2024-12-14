@@ -1,3 +1,4 @@
 .env
 /infra/postgres/data
+/infra/postgres/backups
 package-lock.json

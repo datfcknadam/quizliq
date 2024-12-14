@@ -19,7 +19,7 @@
             :disable="questionState !== QUESTION_STATE.ACTIVE"
             :size="answer === String(choice.id) ? 'xl' : 'md'"
             class="col-grow col-1"
-            @click="() => gameStore.setChoice(choice.id)"
+            @click="() => gameStore.selectChoice(choice.id)"
           />
         </div>
       </q-card-actions>
@@ -36,8 +36,8 @@ import { QUESTION_STATE } from '../const/game.enum';
 
 const gameStore = useGameStore();
 const gcStore = useGcStore();
-const { question, questionState, selectedChoice, time, getClientAnswers, answer } = storeToRefs(gameStore);
-const { currentClient, clients } = storeToRefs(gcStore);
+const { question, questionState, selectedChoice, time, answer } = storeToRefs(gameStore);
+const { currentClient } = storeToRefs(gcStore);
 
 const color = (choiceId) => {
   return choiceId === selectedChoice.value ? currentClient.value.color : 'grey';

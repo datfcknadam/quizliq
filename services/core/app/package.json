@@ -26,14 +26,12 @@
     "@nestjs/platform-socket.io": "^10.3.8",
     "@nestjs/websockets": "^10.3.8",
     "@socket.io/redis-adapter": "^8.3.0",
-    "cache-manager": "^5.5.2",
-    "qs": "^6.12.1",
-    "redis": "^4.6.13",
+    "qs": "6.13.1",
+    "redis": "4.7.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "socket.io": "^4.7.5",
-    "undici": "^6.16.0",
-    "uuid": "^9.0.1"
+    "rxjs": "7.8.1",
+    "socket.io": "4.8.1",
+    "undici": "7.1.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",
@@ -56,7 +54,7 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "4.2.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.7.2"
   },
   "jest": {
     "moduleFileExtensions": [

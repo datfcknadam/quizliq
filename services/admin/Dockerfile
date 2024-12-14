@@ -1,4 +1,4 @@
-FROM node:20.13.1-alpine3.19 as development
+FROM node:22.12-alpine3.21 as development
 
 WORKDIR /usr/src/app
 
@@ -7,7 +7,7 @@ RUN npm install
 
 CMD ["npm", "run", "develop"]
 
-FROM node:20.13.1-alpine3.19 as production
+FROM node:22.12-alpine3.21 as production
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}

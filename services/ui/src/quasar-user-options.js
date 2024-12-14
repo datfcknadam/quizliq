@@ -4,6 +4,11 @@ import 'vue3-svg-map/style.css';
 
 // To be used on app.use(Quasar, { ... })
 export default {
-  config: {},
+  config: {
+    brand: {
+      primary: '#ab3fe0',
+      secondary: '#9c67ff',
+    }
+  },
   plugins: {},
 };
