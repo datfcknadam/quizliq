@@ -12,19 +12,29 @@ export class ContentService {
     private readonly apiUrl: URL,
   ) {}
 
-  async sendRate(questionId: number, good: boolean) {
+  /**
+   * Send rate of question
+   * @param questionId
+   * @param isGood
+   */
+  async sendRate(questionId: number, isGood: boolean) {
     const { url, headers } = this.buildRequest('question-rates');
     await request(url, {
       headers,
       method: 'POST',
       body: JSON.stringify({
-        good,
+        good: isGood,
         quizliq: questionId,
       }),
     });
   }
 
-  async getRandom(locale?: string): Promise<{ correct: string }> {
+  /**
+   * Get random question from admin
+   * @param locale
+   * @returns
+   */
+  async getRandomQuestion(locale?: string): Promise<{ correct: string }> {
     const { url, headers } = this.buildRequest('quizliqs/random', { locale });
     const { body } = await request(url, {
       headers,

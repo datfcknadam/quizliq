@@ -16,7 +16,7 @@ export class GameQuestionService {
   }
 
   async sendQuestion(roomId: string, users: string[]) {
-    const data = await this.contentService.getRandom();
+    const data = await this.contentService.getRandomQuestion();
     this.commitAnswerQuestion(roomId, data.correct);
     delete data.correct;
 

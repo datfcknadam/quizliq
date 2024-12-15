@@ -4,6 +4,7 @@ import { ContentService } from './content.service';
 
 @Global()
 @Module({})
+// Module for get contents from admin
 export class ContentModule {
   static forRoot(config: { token: string; url: string }): DynamicModule {
     return {

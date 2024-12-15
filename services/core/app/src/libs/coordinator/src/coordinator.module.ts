@@ -8,4 +8,5 @@ import GameModule from 'src/libs/game/src/game.module';
   exports: [CoordinatorService],
   imports: [GameModule],
 })
+// Game coordinator module
 export class CoordinatorModule {}

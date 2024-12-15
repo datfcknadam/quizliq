@@ -39,6 +39,12 @@ export class CoordinatorService {
     return { roomId };
   }
 
+  /**
+   * Join client to room
+   * @param client - socket client
+   * @param param1 - roomId
+   * @returns
+   */
   private async joinRoom(
     client: Socket,
     { roomId }: { roomId: string },
@@ -64,6 +70,11 @@ export class CoordinatorService {
     return result.payload;
   }
 
+  /**
+   * Leave client from rooms
+   * @param client
+   * @param param1
+   */
   private async leaveRoom(
     client: Socket,
     { roomId }: { roomId: string },

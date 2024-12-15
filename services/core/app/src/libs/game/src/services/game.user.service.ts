@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { EventService } from 'src/libs/event/src';
 import { GameUserChoice } from '../interfaces/game.user.interface';
-import { GamePoolService } from './game.pool.service';
 
 @Injectable()
 export class GameUserService {

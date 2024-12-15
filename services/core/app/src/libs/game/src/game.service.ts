@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 import { GAME_STATE } from './const/game.const';
@@ -19,24 +19,25 @@ export class GameService {
     selectChoice: this.selectChoice,
   };
 
+  // fsm transit map
   private readonly transitions = {
     [GAME_STATE.LOBBY]: {
       next: GAME_STATE.PREPARE,
     },
     [GAME_STATE.PREPARE]: {
       next: GAME_STATE.CONTEST,
-      fn: (roomId: string) => this.positionSetting(roomId),
+      fn: (roomId: string) => this.setPositionSettingMode(roomId),
     },
     [GAME_STATE.CONTEST]: {
-      fn: (roomId: string) => this.contest(roomId),
+      fn: (roomId: string) => this.setContestMode(roomId),
     },
     [GAME_STATE.LAND_GRAB]: {
       next: GAME_STATE.CONTEST,
-      fn: (roomId: string) => this.positionSetting(roomId),
+      fn: (roomId: string) => this.setPositionSettingMode(roomId),
     },
     [GAME_STATE.BATTLE]: {
       next: GAME_STATE.CONTEST,
-      fn: (roomId: string) => this.contest(roomId),
+      fn: (roomId: string) => this.setContestMode(roomId),
     },
     [GAME_STATE.FINISH]: {
       next: GAME_STATE.FINISH,
@@ -102,6 +103,11 @@ export class GameService {
     return this.gameStateService.getState(roomId);
   }
 
+  /**
+   * Game-tick after every game event, call next transition if is posible
+   * @param roomId
+   * @returns
+   */
   private async tick(roomId: string): Promise<void> {
     const state = await this.gameStateService.getState(roomId);
     const transition = this.transitions[state];
@@ -113,7 +119,12 @@ export class GameService {
     }
   }
 
-  private async positionSetting(roomId: string): Promise<void> {
+  /**
+   * Set mode when users choose lands and set positions
+   * @param roomId
+   * @returns
+   */
+  private async setPositionSettingMode(roomId: string): Promise<void> {
     const userId = await this.gameUserService.popActiveUser(roomId);
     if (userId) {
       this.gameUserService.setActiveUser(roomId, userId);
@@ -130,23 +141,37 @@ export class GameService {
     this.nextTick(roomId);
   }
 
-  private async contest(roomId: string): Promise<void> {
+  /**
+   * Contest mode
+   * @param roomId
+   */
+  private async setContestMode(roomId: string): Promise<void> {
     await this.gameQuestionService.sendQuestion(
       roomId,
       await this.gameUserService.getAllActiveUsers(roomId),
     );
   }
 
+  /**
+   * First point of game
+   * @param client
+   * @param param1
+   * @returns
+   */
   private async startGame(client: Socket, { roomId }: { roomId: string }) {
+    const users = await this.gamePoolService.getUsers(roomId);
+    if (users.length < 2) {
+      // todo: add error-system
+      throw new BadRequestException({
+        message: 'Error',
+      });
+    }
     client.to(roomId).emit('game', {
       method: 'startGame',
       payload: { roomId },
     });
     this.setStatus(roomId, GAME_STATE.PREPARE);
-    this.gameUserService.addActiveUsersQueue(
-      roomId,
-      await this.gamePoolService.getUsers(roomId),
-    );
+    this.gameUserService.addActiveUsersQueue(roomId, users);
     this.nextTick(roomId);
     return { roomId, gameState: GAME_STATE.PREPARE };
   }
@@ -263,6 +288,11 @@ export class GameService {
     }
     // else remove losing user from active pool, grab their territory and next tick in status
     // todo: finish game
+    if (allUsers.length === 2) {
+      this.setStatus(roomId, GAME_STATE.FINISH);
+      return [winnerUserId];
+    }
+
     this.setStatus(roomId, GAME_STATE.LAND_GRAB);
     this.gamePositionService.setPosition(roomId, disput.position, {
       userId: winnerUserId,
