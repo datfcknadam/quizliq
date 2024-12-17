@@ -60,7 +60,11 @@ export class GameService {
     this.gamePositionService.provideSockets(sockets);
   }
 
-  public async interface(method: string, client: Socket, payload: unknown) {
+  public async interface(
+    method: keyof typeof this.methodsMap,
+    client: Socket,
+    payload: unknown,
+  ) {
     // todo: validate types
     const data = await this.methodsMap[method].call(this, client, payload);
     return {
@@ -85,11 +89,10 @@ export class GameService {
   }
 
   public async clientJoinGame(roomId: string, userId: string) {
-    await this.gamePoolService.addUser(roomId, userId);
-    const activeUser = await this.gameUserService.getActiveUserByIndex(
-      roomId,
-      0,
-    );
+    const [_, activeUser] = await Promise.all([
+      this.gamePoolService.addUser(roomId, userId),
+      this.gameUserService.getActiveUserByIndex(roomId, 0),
+    ]);
     if (!activeUser) {
       await this.gameUserService.setActiveUser(roomId, userId);
     }
@@ -198,14 +201,16 @@ export class GameService {
     }
 
     await this.gameUserService.cleanActiveUsers(roomId);
-    await this.gameUserService.addActiveUsersQueue(roomId, [
-      positionInfo.userId,
-      client.id,
+    await Promise.all([
+      this.gameUserService.addActiveUsersQueue(roomId, [
+        positionInfo.userId,
+        client.id,
+      ]),
+      this.gamePositionService.setDisput(roomId, position, {
+        userId: positionInfo.userId,
+        rivaluserId: client.id,
+      }),
     ]);
-    this.gamePositionService.setDisput(roomId, position, {
-      userId: positionInfo.userId,
-      rivaluserId: client.id,
-    });
 
     this.setStatus(roomId, GAME_STATE.BATTLE);
     this.nextTick(roomId);
@@ -219,11 +224,13 @@ export class GameService {
       responseRate,
     }: { roomId: string; choice: string; responseRate: number },
   ) {
-    await this.gameUserService.commitChoice(roomId, client.id, {
-      choice,
-      responseRate,
-    });
-    await this.gameUserService.popActiveUser(roomId);
+    await Promise.all([
+      this.gameUserService.commitChoice(roomId, client.id, {
+        choice,
+        responseRate,
+      }),
+      this.gameUserService.popActiveUser(roomId),
+    ]);
     const stack = await this.gameUserService.getLenActiveUsers(roomId);
     if (!stack) {
       const users = await this.finishContest(roomId);
@@ -234,12 +241,15 @@ export class GameService {
   }
 
   private async finishContest(roomId: string): Promise<string[]> {
-    const status = await this.getStatus(roomId);
-    const answer = await this.gameQuestionService.getAnswerQuestion(roomId);
-    const usersAnswers = await this.gameUserService.popChoices(roomId);
-    const usersWhoRights = Object.entries(usersAnswers)
-      .map(([userId, clientAnswer]) => answer === clientAnswer.choice && userId)
-      .filter(Boolean);
+    const [status, answer, usersAnswers] = await Promise.all([
+      this.getStatus(roomId),
+      this.gameQuestionService.getAnswerQuestion(roomId),
+      this.gameUserService.popChoices(roomId),
+    ]);
+
+    const usersWhoRights = Object.keys(usersAnswers).filter(
+      (userId) => answer === usersAnswers[userId].choice,
+    );
 
     this.emitFinishContest(roomId, answer, usersAnswers);
 
@@ -294,10 +304,13 @@ export class GameService {
     }
 
     this.setStatus(roomId, GAME_STATE.LAND_GRAB);
-    this.gamePositionService.setPosition(roomId, disput.position, {
-      userId: winnerUserId,
-    });
-    await this.gamePoolService.removeUser(roomId, userId);
+    Promise.all([
+      this.gamePositionService.setPosition(roomId, disput.position, {
+        userId: winnerUserId,
+      }),
+      this.gamePoolService.removeUser(roomId, userId),
+    ]);
+
     return allUsers.filter((id) => id !== userId);
   }
 
