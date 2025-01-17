@@ -23,94 +23,61 @@ export const useGameStore = defineStore('game', {
     responseTimeStart: null,
     disput: [],
   }),
+  
   getters: {
-    currentUserId: () => {
+    currentUserId() {
       const connection = useConnectionStore();
       return connection.socketId;
     },
-    isActiveUser: function(state) { return state.activeUserId === this.currentUserId },
-    flatSelectedLocations: state => [...state.selectedLocations.keys()],
-    getAvailableLocations: function(state) {
+    isActiveUser(state) {
+      return state.activeUserId === this.currentUserId;
+    },
+    flatSelectedLocations(state) {
+      return [...state.selectedLocations.keys()];
+    },
+    getAvailableLocations(state) {
       const availableLocations = new Set();
       const notAvailableLocations = new Set();
+
       state.map.locations.forEach(({ id }) => {
         const userId = state.selectedLocations.get(id);
         const locationAndNeightbours = state.neightboursLocations[id].concat(id);
 
         if (state.gameState === GAME_STATE.PREPARE) {
-          if (userId && userId !== this.currentUserId) {
-            locationAndNeightbours.forEach(location => {
-              notAvailableLocations.add(location);
-              availableLocations.delete(location);
-            });
-            return;
-          }
-          locationAndNeightbours.map(neigthbours => {
-            if (notAvailableLocations.has(neigthbours)) {
-              return;
-            }
-            availableLocations.add(neigthbours)
-          });
-        } 
-        if (userId === this.currentUserId) {
-          locationAndNeightbours.map(neigthbours => {
-            if (notAvailableLocations.has(neigthbours)) {
-              return;
-            }
-            availableLocations.add(neigthbours)
-          });
+          this.updateAvailableLocations(userId, locationAndNeightbours, availableLocations, notAvailableLocations);
+        } else if (userId === this.currentUserId) {
+          this.addAvailableLocations(locationAndNeightbours, availableLocations, notAvailableLocations);
         }
       });
+
       return availableLocations;
     },
-    isAvailableLocation: function (state) {
-      return (locationId) => {
-        
-        return this.getAvailableLocations.has(locationId);
-      }
+    isAvailableLocation(state) {
+      return (locationId) => this.getAvailableLocations.has(locationId);
     },
     getMap(state) {
       const gcStore = useGcStore();
-      return ({
+      return {
         ...state.map,
-        locations: state.map.locations.map(location => {
-          const styleClasses = [];
-          const userId = state.selectedLocations.get(location.id);
-
-          if (!this.getAvailableLocations.has(location.id)) {
-            styleClasses.push('disabled')
-          }
-
-          if (!userId) {
-            return {
-              ...location,
-              class: styleClasses, 
-            };
-          }
-
-          const { color } = gcStore.clients.get(userId);
-          
-          styleClasses.push(`fill-${color}`);
-          return {
-            ...location,
-            class: styleClasses,
-          }
-        }),
-      });
+        locations: state.map.locations.map(location => this.mapLocation(location, gcStore, state)),
+      };
     },
     getClientAnswers(state) {
       const gcStore = useGcStore();
       const answerMap = new Map();
+
       Object.entries(state.userAnswers).forEach(([userId, answer]) => {
         const user = gcStore.clients.get(userId);
-        if (answerMap.has(answer)) {
-          return answerMap.set(answer, [user])
+        if (!answerMap.has(answer)) {
+          answerMap.set(answer, []);
         }
-        return answerMap.get(answer).push(user);
+        answerMap.get(answer).push(user);
       });
+
       return answerMap;
     },
   },
+
   actions: {
     bootstrap() {
       socket.on('game', ({ method, payload }) => {
@@ -130,10 +97,7 @@ export const useGameStore = defineStore('game', {
       }
     },
     selectPosition(position) {
-      if (!this.isActiveUser
-          || !position
-          || !this.getAvailableLocations.has(position)
-          || this.selectedLocations.get(position) === this.currentUserId) {
+      if (!this.isActiveUser || !position || !this.getAvailableLocations.has(position) || this.selectedLocations.get(position) === this.currentUserId) {
         return;
       }
       socket.emit('game', {
@@ -163,22 +127,27 @@ export const useGameStore = defineStore('game', {
       socket.emit('game', {
         method: 'selectChoice',
         payload: {
+         
           choice,
           roomId: router.currentRoute.value.params.id,
           responseRate: Date.now() - this.responseTimeStart,
-         },
+        },
       });
     },
     sendQuestionRes({ question, options }) {
       const preparedQuestion = question.type === QUESTION_TYPE.OPTION_SELECTION
-      ? { ...question, choices: JSON.parse(question.choices)} : question;
-      this.selectedChoice = null;
-      this.answer = null;
+        ? { ...question, choices: JSON.parse(question.choices) }
+        : question;
+
+      this.resetQuestionState();
       this.responseTimeStart = Date.now();
-      this.stopTimer();
       this.startTimer(options.time);
-      const isForCurrentUser = this.disput.findIndex(id => id === this.currentUserId) !== -1;
-      this.questionState = this.gameState !== GAME_STATE.BATTLE || isForCurrentUser ? QUESTION_STATE.ACTIVE : QUESTION_STATE.ONLY_SHOW;
+
+      const isForCurrentUser = this.disput.includes(this.currentUserId);
+      this.questionState = this.gameState !== GAME_STATE.BATTLE || isForCurrentUser
+        ? QUESTION_STATE.ACTIVE
+        : QUESTION_STATE.ONLY_SHOW;
+
       this.question = preparedQuestion;
     },
     startTimer(time) {
@@ -197,10 +166,51 @@ export const useGameStore = defineStore('game', {
     },
     finishContestRes({ answer, usersAnswers }) {
       this.answer = answer;
-      this.usersAnswers = usersAnswers;
+      this.userAnswers = usersAnswers;
     },
-    setDisputRes({ userId, rivaluserId }) {
-      this.disput = [userId, rivaluserId];
-    }
+    setDisputRes({ userId, rivalUserId }) {
+      this.disput = [userId, rivalUserId];
+    },
+
+    // Вспомогательные методы
+    updateAvailableLocations(userId, locationAndNeightbours, availableLocations, notAvailableLocations) {
+      if (userId && userId !== this.currentUserId) {
+        locationAndNeightbours.forEach(location => {
+          notAvailableLocations.add(location);
+          availableLocations.delete(location);
+        });
+      } else {
+        this.addAvailableLocations(locationAndNeightbours, availableLocations, notAvailableLocations);
+      }
+    },
+    addAvailableLocations(locationAndNeightbours, availableLocations, notAvailableLocations) {
+      locationAndNeightbours.forEach(neighbour => {
+        if (!notAvailableLocations.has(neighbour)) {
+          availableLocations.add(neighbour);
+        }
+      });
+    },
+    mapLocation(location, gcStore, state) {
+      const styleClasses = [];
+      const userId = state.selectedLocations.get(location.id);
+
+      if (!this.getAvailableLocations.has(location.id)) {
+        styleClasses.push('disabled');
+      }
+
+      if (userId) {
+        const { color } = gcStore.clients.get(userId);
+        styleClasses.push(`fill-${color}`);
+      }
+
+      return {
+        ...location,
+        class: styleClasses,
+      };
+    },
+    resetQuestionState() {
+      this.selectedChoice = null;
+      this.answer = null;
+    },
   },
 });
